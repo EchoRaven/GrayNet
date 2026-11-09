@@ -1,0 +1,12 @@
+# Contract fixture only. This file is not a deployed or validated network case.
+name: graynet-fixture
+topology:
+  nodes:
+    client:
+      kind: linux
+      image: alpine:3
+    server:
+      kind: linux
+      image: alpine:3
+  links:
+    - endpoints: [client:eth1, server:eth1]

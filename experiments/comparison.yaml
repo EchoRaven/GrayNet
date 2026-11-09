@@ -1,0 +1,31 @@
+schema_version: 2
+name: astra-luna-degradation-comparison
+evaluation:
+  mode: semantic
+  model: gpt-6-astra
+  reasoning_effort: low
+  timeout_seconds: 120
+cases:
+  - ../cases/healthy_control
+  - ../cases/primary_congestion
+  - ../cases/link_loss
+  - ../cases/link_delay
+  - ../cases/endpoint_overload
+  - ../cases/bursty_congestion
+  - ../cases/gradual_congestion
+agents:
+  - id: codex-astra-low
+    driver: codex
+    model: gpt-6-astra
+    reasoning_effort: low
+    timeout_seconds: 180
+    max_tool_calls: 40
+  - id: codex-luna-low
+    driver: codex
+    model: gpt-6-luna
+    reasoning_effort: low
+    timeout_seconds: 180
+    max_tool_calls: 40
+repetitions: 5
+order_seed: 538
+fault_seed: 11

@@ -1,0 +1,37 @@
+schema_version: 1
+id: link-delay-01
+title: delay on the server access link
+topology: ../../environments/two_path/topology.clab.yml
+network: two_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: link_delay
+  node: r2
+  interface: eth3
+  delay_ms: 200
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    Added delay on the r2:eth3--user-server:eth1 access link increases end-to-end
+    latency and reduces TCP throughput. The link and BGP sessions remain up.
+    The diagnosis should distinguish localized added delay from normal loaded
+    queue latency or endpoint CPU contention. The exact delay value is not required.
+  anomaly: true
+  component: r2:eth3
+  component_aliases: [user-server:eth1]
+  mechanism: delay
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

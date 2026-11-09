@@ -1,0 +1,153 @@
+from dataclasses import replace
+from pathlib import Path
+
+import pytest
+
+from graynet.environments.containerlab import ContainerlabBackend
+from graynet.scenarios.definitions import load_case
+from graynet.tools.network import queue_statistics
+
+ROOT = Path(__file__).parents[1]
+
+
+@pytest.mark.parametrize(
+    "case_name",
+    [
+        "primary_congestion",
+        "healthy_control",
+        "link_loss",
+        "link_delay",
+        "endpoint_overload",
+        "bursty_congestion",
+        "gradual_congestion",
+    ],
+)
+def test_all_cases_use_the_same_operational_view_and_tool_policy(case_name):
+    case = load_case(ROOT / "cases" / case_name)
+    healthy = load_case(ROOT / "cases/healthy_control")
+    backend = ContainerlabBackend(case)
+    assert case.incident == healthy.incident and case.incident_path == healthy.incident_path
+    assert case.environment == healthy.environment
+    assert backend.network.policy == ContainerlabBackend(healthy).network.policy
+    assert case.workload == healthy.workload
+
+
+@pytest.mark.parametrize("workers", [0, 65, True])
+def test_endpoint_competing_work_is_bounded(workers):
+    case = load_case(ROOT / "cases/endpoint_overload")
+    with pytest.raises(ValueError, match="workers"):
+        ContainerlabBackend(replace(case, fault={**case.fault, "workers": workers}))
+
+
+def test_endpoint_overload_requires_matched_healthy_cpu_limit():
+    case = load_case(ROOT / "cases/endpoint_overload")
+    workload = {key: value for key, value in case.workload.items() if key != "cpu_limit_cores"}
+    with pytest.raises(ValueError, match="CPU limit"):
+        ContainerlabBackend(replace(case, workload=workload))
+
+
+@pytest.mark.parametrize(
+    "kind,field,value",
+    [
+        ("link_loss", "loss_percent", 101),
+        ("link_delay", "delay_ms", -1),
+        ("link_loss", "seed", True),
+    ],
+)
+def test_rejects_bad_impairment_parameters(kind, field, value):
+    case = load_case(ROOT / "cases" / kind)
+    with pytest.raises(ValueError):
+        ContainerlabBackend(replace(case, fault={**case.fault, field: value}))
+
+
+def test_impairment_cannot_replace_the_operational_shaper():
+    case = load_case(ROOT / "cases/link_loss")
+    with pytest.raises(ValueError, match="shaper"):
+        ContainerlabBackend(replace(case, fault={**case.fault, "node": "r1", "interface": "eth3"}))
+
+
+def test_loss_start_verify_restore_and_idempotent_cleanup(monkeypatch):
+    backend = ContainerlabBackend(load_case(ROOT / "cases/link_loss"))
+    commands = []
+    active = False
+    monkeypatch.setattr("graynet.environments.faults.time.sleep", lambda seconds: None)
+
+    def docker(node, *args, **kwargs):
+        nonlocal active
+        commands.append((node, args))
+        if args[:3] == ("tc", "qdisc", "add"):
+            active = True
+        if args[:3] == ("tc", "qdisc", "del"):
+            active = False
+        return (
+            "qdisc netem 10: root loss 2%\n Sent 100 bytes 5 pkt (dropped 3, overlimits 0 requeues 0)"
+            if active
+            else "qdisc noqueue 0: root"
+        )
+
+    monkeypatch.setattr(backend, "_docker", docker)
+    backend.fault.start()
+    assert backend.fault.snapshot()["dropped"] == 3
+    assert any("seed" in command[1] and "11" in command[1] for command in commands)
+    backend.fault.stop()
+    before = len(commands)
+    backend.fault.stop()
+    assert len(commands) == before
+
+
+def test_queue_telemetry_never_reveals_simulator_parameters():
+    stats = "\n Sent 123 bytes 7 pkt (dropped 2, overlimits 4 requeues 0)\n backlog 100b 1p\n"
+    loss = queue_statistics("qdisc netem 10: root loss 2% seed 11" + stats)
+    shape = queue_statistics("qdisc tbf 1: root rate 40Mbit" + stats)
+    assert loss == shape
+    for secret in ("netem", "tbf", "2%", "seed", "40Mbit", "10:"):
+        assert secret not in loss
+    with pytest.raises(ValueError):
+        queue_statistics("qdisc netem root loss 2% malformed output")
+
+
+def test_rejects_unknown_fields_and_unsupported_metrics():
+    case = load_case(ROOT / "cases/link_loss")
+    with pytest.raises(ValueError, match="unexpected"):
+        ContainerlabBackend(replace(case, fault={**case.fault, "shell": "cat /answer"}))
+    with pytest.raises(ValueError, match="throughput_mbps"):
+        ContainerlabBackend(replace(case, validation=replace(case.validation, metric="latency")))
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        {"kind": "bursty", "on_seconds": 0, "off_seconds": 10},
+        {"kind": "gradual", "step_seconds": 10, "rates_mbps": [10, 5, 35]},
+        {"kind": "gradual", "step_seconds": 10, "rates_mbps": [10, 20]},
+        {"kind": "gradual", "step_seconds": 10, "rates_mbps": [10, 20, 30]},
+    ],
+)
+def test_bad_schedules_are_rejected_before_starting_a_thread(pattern):
+    case = load_case(ROOT / "cases/primary_congestion")
+    with pytest.raises(ValueError):
+        ContainerlabBackend(replace(case, fault={**case.fault, "pattern": pattern}))
+
+
+def test_agent_probe_uses_the_same_workload_and_records_validation_evidence(monkeypatch):
+    backend = ContainerlabBackend(load_case(ROOT / "cases/link_loss"))
+    backend.evidence["agent_window"] = {"records": []}
+    monkeypatch.setattr(
+        backend,
+        "_service_sample",
+        lambda duration: {
+            "throughput_mbps": 8,
+            "started_monotonic": 1,
+            "finished_monotonic": 5,
+            "started_at": "2026-10-07T01:00:00Z",
+            "finished_at": "2026-10-07T01:00:04Z",
+        },
+    )
+    assert backend.probe_for_agent() == {
+        "throughput_mbps": 8,
+        "duration_seconds": 4,
+        "tcp_mean_rtt_ms": None,
+        "measurement_started_at": "2026-10-07T01:00:00Z",
+        "measurement_finished_at": "2026-10-07T01:00:04Z",
+    }
+    assert backend.evidence["agent_window"]["records"][0]["origin"] == "agent_probe"

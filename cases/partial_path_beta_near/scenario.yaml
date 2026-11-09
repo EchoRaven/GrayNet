@@ -1,0 +1,41 @@
+schema_version: 1
+id: partial-path-beta-near
+title: Selective inter-router loss for beta (near)
+topology: ../../environments/partial_path/topology.clab.yml
+network: partial_path
+workload:
+  kind: iperf3
+  client: alpha-client
+  server: alpha-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  rate_mbps: 40
+  cpu_limit_cores: 0.5
+fault:
+  kind: link_loss
+  node: r1
+  interface: eth4
+  loss_percent: 0.14
+  seed: 11
+  duration_seconds: 180
+partial_path:
+  flow: beta
+  min_slowdown: 0.26
+  max_slowdown: 0.43
+ground_truth:
+  anomaly: true
+  component: r1:eth4
+  component_aliases: [r2:eth2]
+  mechanism: packet_loss
+  diagnosis: >-
+    Loss on the beta inter-router link lowers that service below its throughput requirement.
+    The other service still meets its requirement, and both routes remain available.
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.25
+  min_samples: 5
+  max_baseline_cv: 0.08
+  recovery_tolerance: 0.08
+  min_affected_fraction: 0.8

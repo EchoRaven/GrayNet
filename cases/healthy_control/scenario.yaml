@@ -1,0 +1,29 @@
+schema_version: 1
+id: healthy-control-01
+title: Healthy network under the standard workload
+topology: ../../environments/two_path/topology.clab.yml
+network: two_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: none
+ground_truth:
+  diagnosis: >-
+    No fault is active. Service throughput remains within normal variation of
+    the healthy reference under the same workload. Loaded TCP traffic can create
+    queue backlog and increase RTT without abnormal service degradation. The
+    diagnosis should not infer congestion from counters or an operator report alone.
+  anomaly: false
+validation:
+  metric: throughput_mbps
+  effect: stable
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

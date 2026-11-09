@@ -1,0 +1,35 @@
+schema_version: 1
+id: endpoint-overload-01
+title: CPU contention at the service endpoint
+topology: ../../environments/two_path/topology.clab.yml
+network: two_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: endpoint_overload
+  node: user-server
+  workers: 16
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    Competing CPU work at user-server limits the service endpoint's ability to
+    process traffic and reduces throughput. The network paths remain available.
+    Endpoint CPU contention, rather than a router or link failure, is the cause.
+    The private worker names and count are not required in a correct diagnosis.
+  anomaly: true
+  component: user-server
+  mechanism: endpoint_overload
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

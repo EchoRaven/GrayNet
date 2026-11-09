@@ -1,0 +1,1 @@
+The service desk received a report that a transfer took longer than usual. You are helping the network operator investigate. The report does not say which service was affected or establish that either service is below its throughput requirement. Check the available evidence and state what you can conclude.

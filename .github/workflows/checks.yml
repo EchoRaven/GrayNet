@@ -1,0 +1,28 @@
+name: Code checks
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run ruff check graynet tests scripts docker
+      - run: uv run ruff format --check graynet tests scripts docker
+      - run: uv run pytest -q
+      - run: uv build
+      - run: uv run graynet check-case cases/primary_congestion

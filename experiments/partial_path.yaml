@@ -1,0 +1,16 @@
+schema_version: 1
+name: partial-path-probe-choice
+cases:
+  - ../cases/partial_path_control
+  - ../cases/partial_path_alpha_mild
+  - ../cases/partial_path_beta_mild
+  - ../cases/partial_path_alpha_near
+  - ../cases/partial_path_beta_near
+  - ../cases/partial_path_alpha_clear
+  - ../cases/partial_path_beta_clear
+fixed_flow: alpha
+repetitions: 2
+order_seed: 538
+fault_seed: 11
+max_tool_calls: 9
+timeout_seconds: 60

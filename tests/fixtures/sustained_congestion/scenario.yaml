@@ -1,0 +1,24 @@
+schema_version: 1
+id: sustained-congestion-01
+title: Congestion on the primary path
+topology: topology.clab.yml
+workload:
+  kind: iperf3
+  source: client
+  destination: server
+fault:
+  kind: cross_traffic
+  target: r1-r2
+ground_truth:
+  anomaly: true
+  component: r1-r2
+  mechanism: congestion
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.10
+  recovery_tolerance: 0.10
+  min_affected_fraction: 0.80

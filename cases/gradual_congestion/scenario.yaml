@@ -1,0 +1,45 @@
+schema_version: 1
+id: gradual-congestion-01
+title: gradual cross traffic on a preferred path
+topology: ../../environments/two_path/topology.clab.yml
+network: two_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: cross_traffic
+  client: load-client
+  server: load-server
+  server_ip: 10.4.0.2
+  rate_mbps: 35
+  duration_seconds: 240
+  pattern:
+    kind: gradual
+    step_seconds: 16
+    rates_mbps: [10, 20, 35]
+ground_truth:
+  diagnosis: >-
+    Increasing competing traffic gradually congests the primary r1:eth3--r2:eth1
+    path. Service throughput worsens as the shared bottleneck receives more load.
+    Routing and reachability remain available. The diagnosis should describe
+    worsening queue contention, not a clean link outage. An agent need not
+    identify the private traffic generator or its exact rate schedule.
+  anomaly: true
+  component: r1-r2-primary
+  mechanism: congestion
+  component_aliases: ["r1:eth3", "r2:eth1", "r1:eth3--r2:eth1"]
+  mechanism_aliases: ["cross-traffic congestion", "queue contention"]
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 12
+  pattern: gradual
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "graynet"
+version = "0.1.0"
+description = "A benchmark foundation for network degradation diagnosis"
+requires-python = ">=3.11"
+dependencies = ["PyYAML>=6.0,<7", "pydantic>=2.12,<3"]
+
+[project.scripts]
+graynet = "graynet.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "ruff>=0.14,<1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["graynet/artifacts/atif", "results", "diagnostics"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
