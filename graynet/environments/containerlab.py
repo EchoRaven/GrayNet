@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from graynet.environments.base import Phase
-from graynet.environments.faults import ScheduledTraffic, build_fault
+from graynet.environments.faults import BGP_FAULTS, ScheduledTraffic, build_fault
 from graynet.environments.network import load_network
 from graynet.evaluation.validation import validate_sustained_case, validate_temporal_case
 from graynet.paths import REPOSITORY_ROOT
@@ -320,6 +320,10 @@ class ContainerlabBackend:
             raise CommandError(f"cannot read {node} interface counters: {raw[-500:]}") from exc
 
     def _checks(self) -> dict[str, Any]:
+        self._verify_noise()
+        if self.fault.active and self.fault.kind in BGP_FAULTS:
+            # The fault verifier checks the diverted path; expected routes do not apply.
+            return {"bgp": "routing_fault_active", "routes": {}, "rtt_avg_ms": None}
         peers = {node: self._bgp_summary(node) for node in self.network.bgp_peers}
         routes = {
             name: self._route(
@@ -461,8 +465,33 @@ class ContainerlabBackend:
                 "/tmp/graynet-workload.log",
                 "--forceflush",
             )
+        self._start_noise()
         time.sleep(1)
         self.evidence["post_deploy"] = self._checks()
+
+    def _start_noise(self) -> None:
+        noise = self.network.noise
+        if noise is None:
+            return
+        self._docker(noise["server"], "iperf3", "-s", "-D")
+        rates = " ".join(f"{rate:g}" for rate in noise["rates_mbps"])
+        script = (
+            f"while :; do for r in {rates}; do iperf3 -c {noise['server_ip']} -u -b ${{r}}M "
+            f"-l 1200 -t {noise['step_seconds']} >/dev/null 2>&1; done; done"
+        )
+        self._docker(noise["client"], "sh", "-c", script, detached=True)
+        self.evidence["background_noise"] = noise
+
+    def _verify_noise(self) -> None:
+        noise = self.network.noise
+        if noise is None:
+            return
+        running = run_process(
+            ["docker", "exec", self._container(noise["client"]), "pgrep", "-f", "while :"],
+            check=False,
+        )
+        if running.returncode != 0:
+            raise CommandError("background traffic stopped during the episode")
 
     def _wait_for_routing(self) -> None:
         last_error: Exception | None = None
@@ -586,7 +615,7 @@ class ContainerlabBackend:
         }
         if (
             phase == "incident"
-            and self.fault.kind == "link_loss"
+            and self.fault.kind in ("link_loss", "link_burst_loss", "link_police")
             and not case.benign_fault
             and self.evidence["phases"][phase]["fault_after"]["dropped"] <= fault_before["dropped"]
         ):

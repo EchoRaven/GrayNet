@@ -1,0 +1,40 @@
+schema_version: 1
+id: bgp-weight-misconfiguration-01
+title: BGP preference misconfiguration
+topology: ../../environments/backup_path/topology.clab.yml
+network: backup_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: bgp_weight
+  node: r1
+  asn: 65001
+  peer: 10.12.0.2
+  destination: 10.2.0.2
+  via: 10.12.1.2
+  weight: 50
+  restore_weight: 200
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    A changed BGP preference on r1 makes the forward path use the 15 Mbps backup
+    link even though both sessions remain established. The return path still
+    uses the primary link. Forward route selection on r1 shows the cause.
+  anomaly: true
+  component: r1
+  component_aliases: [r1:eth4, r1:eth3]
+  mechanism: routing
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

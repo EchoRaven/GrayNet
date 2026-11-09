@@ -1,0 +1,27 @@
+schema_version: 1
+id: four-hop-healthy-control-01
+title: Healthy four-router chain
+topology: ../../environments/four_hop/topology.clab.yml
+network: four_hop
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: none
+ground_truth:
+  diagnosis: >-
+    No fault is active. Service throughput stays within its requirement across
+    the router chain.
+  anomaly: false
+validation:
+  metric: throughput_mbps
+  effect: stable
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

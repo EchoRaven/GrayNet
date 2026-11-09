@@ -66,6 +66,7 @@ class NetworkSpec:
     endpoint_cpu_affinity: str = "unrestricted"
     flows: dict[str, ServiceFlow] | None = None
     service_min_fraction: float | None = None
+    noise: dict[str, Any] | None = None
 
 
 def _slug(value: Any, field: str) -> str:
@@ -165,7 +166,7 @@ def load_network(case: CaseDefinition) -> NetworkSpec:
     if (
         not isinstance(profile, dict)
         or not required <= set(profile)
-        or set(profile) - required - {"endpoint_cpu_affinity"}
+        or set(profile) - required - {"endpoint_cpu_affinity", "noise"}
         or type(profile["schema_version"]) is not int
         or profile["schema_version"] != 1
     ):
@@ -286,6 +287,21 @@ def load_network(case: CaseDefinition) -> NetworkSpec:
             raise ValueError("background controllers must be unmanaged topology endpoints")
     if background:
         _address(background["server_ip"])
+    noise = profile.get("noise")
+    if noise is not None and (
+        not isinstance(noise, dict)
+        or set(noise) != {"client", "server", "server_ip", "rates_mbps", "step_seconds"}
+        or noise["client"] not in nodes
+        or noise["server"] not in nodes
+        or {noise["client"], noise["server"]} & set(managed)
+        or not noise["rates_mbps"]
+        or any(type(rate) not in (int, float) or rate <= 0 for rate in noise["rates_mbps"])
+        or type(noise["step_seconds"]) is not int
+        or noise["step_seconds"] < 1
+    ):
+        raise ValueError("background noise needs unmanaged endpoints and a rate schedule")
+    if noise is not None:
+        _address(noise["server_ip"])
     flows = None
     service_min_fraction = None
     if case.partial_path is not None:
@@ -349,4 +365,5 @@ def load_network(case: CaseDefinition) -> NetworkSpec:
         affinity,
         flows,
         service_min_fraction,
+        noise,
     )

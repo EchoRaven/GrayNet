@@ -1,0 +1,42 @@
+schema_version: 1
+id: multi-loss-and-endpoint-overload-01
+title: Packet loss and endpoint CPU overload
+topology: ../../environments/two_path/topology.clab.yml
+network: two_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: multiple
+  faults:
+    - kind: link_loss
+      node: r2
+      interface: eth3
+      loss_percent: 1
+      seed: 11
+    - kind: endpoint_overload
+      node: user-server
+      workers: 32
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    Two independent problems are active: packet loss on the r2:eth3 access link
+    and CPU saturation on user-server. An explanation of only one of them is
+    incomplete.
+  anomaly: true
+  component: r2:eth3
+  component_aliases: [user-server, user-server:eth1]
+  mechanism: multiple
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

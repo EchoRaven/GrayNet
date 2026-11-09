@@ -1,0 +1,39 @@
+schema_version: 1
+id: bgp-session-down-01
+title: Primary BGP session administratively down
+topology: ../../environments/backup_path/topology.clab.yml
+network: backup_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: bgp_session_down
+  node: r1
+  asn: 65001
+  peer: 10.12.0.2
+  destination: 10.2.0.2
+  via: 10.12.1.2
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    The r1 BGP session over the primary link is shut down, so service traffic
+    moves to the 15 Mbps backup link and throughput falls. The primary link
+    itself remains up. BGP neighbor state and the route via 10.12.1.2 show the
+    cause.
+  anomaly: true
+  component: r1
+  component_aliases: [r2, r1:eth3, r1:eth4]
+  mechanism: routing
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

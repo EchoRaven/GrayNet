@@ -1,0 +1,38 @@
+schema_version: 1
+id: noisy-primary-congestion-01
+title: Sustained congestion with varying background traffic
+topology: ../../environments/noisy_two_path/topology.clab.yml
+network: noisy_two_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: cross_traffic
+  client: load-client
+  server: load-server
+  server_ip: 10.4.0.2
+  rate_mbps: 25
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    Sustained competing traffic well above the usual background level congests
+    the primary r1:eth3--r2:eth1 path. Other traffic varies throughout the
+    episode, so a single sample is not sufficient.
+  anomaly: true
+  component: r1-r2-primary
+  component_aliases: [r1:eth3, r2:eth1, "r1:eth3--r2:eth1"]
+  mechanism: congestion
+  mechanism_aliases: ["cross-traffic congestion", "queue contention"]
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

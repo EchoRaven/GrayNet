@@ -1,0 +1,28 @@
+schema_version: 1
+id: noisy-healthy-control-01
+title: Healthy network with varying background traffic
+topology: ../../environments/noisy_two_path/topology.clab.yml
+network: noisy_two_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: none
+ground_truth:
+  diagnosis: >-
+    No fault is active. Service throughput varies with ordinary background
+    traffic but stays within its requirement. Variation alone does not establish
+    a fault.
+  anomaly: false
+validation:
+  metric: throughput_mbps
+  effect: stable
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

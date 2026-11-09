@@ -64,7 +64,7 @@ def test_each_portfolio_uses_shared_public_inputs(profile):
     expected = environment / "incident.md"
     cases = [load_case(path) for path in sorted((root / "cases").iterdir()) if path.is_dir()]
     cases = [case for case in cases if case.network == profile]
-    assert len(cases) == {"two_path": 28, "partial_path": 9}[profile]
+    assert len(cases) == {"two_path": 36, "partial_path": 9}[profile]
     assert {case.incident_path for case in cases} == {expected.resolve()}
     assert {case.incident for case in cases} == {expected.read_text().strip()}
     assert {case.environment_path for case in cases} == {environment / "environment.md"}

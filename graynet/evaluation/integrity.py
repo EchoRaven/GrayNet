@@ -16,6 +16,7 @@ MECHANISMS = (
     "delay",
     "endpoint_overload",
     "capacity_limit",
+    "mtu_mismatch",
     "routing",
     "multiple",
     "unknown",

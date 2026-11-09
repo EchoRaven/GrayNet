@@ -1,0 +1,27 @@
+schema_version: 1
+id: backup-path-healthy-control-01
+title: Healthy network with a lower-capacity backup link
+topology: ../../environments/backup_path/topology.clab.yml
+network: backup_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: none
+ground_truth:
+  diagnosis: >-
+    No fault is active. Service traffic uses the primary link and meets its
+    requirement. The lower capacity of the backup link is expected.
+  anomaly: false
+validation:
+  metric: throughput_mbps
+  effect: stable
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

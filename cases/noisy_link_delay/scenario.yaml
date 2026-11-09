@@ -1,0 +1,36 @@
+schema_version: 1
+id: noisy-link-delay-01
+title: Added delay with varying background traffic
+topology: ../../environments/noisy_two_path/topology.clab.yml
+network: noisy_two_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: link_delay
+  node: r2
+  interface: eth3
+  delay_ms: 200
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    Added delay on the access link raises RTT and reduces TCP throughput without
+    drops. Other traffic varies throughout the episode, so a single sample is
+    not sufficient.
+  anomaly: true
+  component: r2:eth3
+  component_aliases: [user-server:eth1]
+  mechanism: delay
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

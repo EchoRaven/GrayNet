@@ -1,0 +1,38 @@
+schema_version: 1
+id: link-jitter-weak-client-access-01
+title: Moderate delay variation on user-client:eth1
+topology: ../../environments/two_path/topology.clab.yml
+network: two_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: link_jitter
+  node: user-client
+  interface: eth1
+  delay_ms: 35
+  jitter_ms: 25
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    Moderately variable delay on this link reduces TCP throughput. The effect is
+    limited and routing stays established. Repeated segment RTT measurements
+    should place the variation on this link.
+  anomaly: true
+  component: user-client:eth1
+  component_aliases: [r1:eth1]
+  mechanism: delay
+  mechanism_aliases: ["jitter"]
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

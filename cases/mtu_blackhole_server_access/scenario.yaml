@@ -1,0 +1,39 @@
+schema_version: 1
+id: mtu-blackhole-server-access-01
+title: MTU black hole on the server access link
+topology: ../../environments/two_path/topology.clab.yml
+network: two_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: link_mtu
+  node: r2
+  interface: eth3
+  mtu: 1200
+  icmp_interface: eth1
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    The MTU on the r2:eth3 access link is smaller than the end-to-end path
+    expects, and the router's fragmentation-needed messages do not reach the
+    sender. Small packets and ping succeed, routing stays established, but full-
+    size TCP segments are dropped and transfers stall. Interface MTU values
+    should reveal the mismatch.
+  anomaly: true
+  component: r2:eth3
+  component_aliases: [user-server:eth1]
+  mechanism: mtu_mismatch
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

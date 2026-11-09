@@ -1,0 +1,37 @@
+schema_version: 1
+id: four-hop-midpath-loss-01
+title: Packet loss between r3 and r4
+topology: ../../environments/four_hop/topology.clab.yml
+network: four_hop
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: link_loss
+  node: r3
+  interface: eth2
+  loss_percent: 1
+  seed: 11
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    Packet loss on the r3:eth2--r4:eth1 link reduces TCP throughput. Queue drop
+    counters at r3:eth2 and segment measurements should distinguish it from
+    other hops.
+  anomaly: true
+  component: r3:eth2
+  component_aliases: [r4:eth1]
+  mechanism: packet_loss
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

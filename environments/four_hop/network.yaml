@@ -1,0 +1,43 @@
+schema_version: 1
+data_plane_mtu: 1500
+endpoint_cpu_affinity: single_cpu
+managed_nodes:
+  r1: router
+  r2: router
+  r3: router
+  r4: router
+  user-client: host
+  user-server: host
+public_addresses:
+  - 10.1.0.1
+  - 10.1.0.2
+  - 10.2.0.1
+  - 10.2.0.2
+  - 10.3.0.1
+  - 10.4.0.1
+  - 10.12.0.1
+  - 10.12.0.2
+  - 10.23.0.1
+  - 10.23.0.2
+  - 10.34.0.1
+  - 10.34.0.2
+bgp_peers:
+  r1: [10.12.0.2]
+  r2: [10.12.0.1, 10.23.0.2]
+  r3: [10.23.0.1, 10.34.0.2]
+  r4: [10.34.0.1]
+routes:
+  user_r1: {node: r1, destination: 10.2.0.2, via: 10.12.0.2, interface: eth2}
+  user_r2: {node: r2, destination: 10.2.0.2, via: 10.23.0.2, interface: eth2}
+  user_r3: {node: r3, destination: 10.2.0.2, via: 10.34.0.2, interface: eth2}
+  return_r4: {node: r4, destination: 10.1.0.2, via: 10.34.0.1, interface: eth1}
+  return_r3: {node: r3, destination: 10.1.0.2, via: 10.23.0.1, interface: eth1}
+  return_r2: {node: r2, destination: 10.1.0.2, via: 10.12.0.1, interface: eth1}
+  load: {node: r2, destination: 10.4.0.2, via: 10.23.0.2, interface: eth2}
+  load_return: {node: r3, destination: 10.3.0.2, via: 10.23.0.1, interface: eth1}
+queue: {node: r2, interface: eth2, kind: tbf}
+background:
+  client: load-client
+  server: load-server
+  server_ip: 10.4.0.2
+  interface: eth1

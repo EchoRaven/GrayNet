@@ -55,12 +55,32 @@ def test_endpoint_overload_requires_matched_healthy_cpu_limit():
         ("link_loss", "seed", True),
         ("link_jitter_server_access", "jitter_ms", 501),
         ("link_rate_limit", "rate_mbps", 0),
+        ("mtu_blackhole_server_access", "mtu", 575),
+        ("mtu_blackhole_server_access", "icmp_interface", "eth9"),
+        ("policer_server_access", "rate_mbps", -1),
+        ("bgp_session_down", "peer", "10.9.9.9"),
+        ("bgp_session_down", "asn", "65001"),
     ],
 )
 def test_rejects_bad_impairment_parameters(kind, field, value):
     case = load_case(ROOT / "cases" / IMPAIRMENT_CASES.get(kind, kind))
     with pytest.raises(ValueError):
         ContainerlabBackend(replace(case, fault={**case.fault, field: value}))
+
+
+def test_burst_loss_percentages_are_bounded():
+    case = load_case(ROOT / "cases/link_loss")
+    fault = {
+        "kind": "link_burst_loss",
+        "node": case.fault["node"],
+        "interface": case.fault["interface"],
+        "enter_percent": 1,
+        "exit_percent": 30,
+        "duration_seconds": case.fault["duration_seconds"],
+    }
+    ContainerlabBackend(replace(case, fault=fault))
+    with pytest.raises(ValueError, match="exit_percent"):
+        ContainerlabBackend(replace(case, fault={**fault, "exit_percent": 101}))
 
 
 def test_impairment_cannot_replace_the_operational_shaper():
@@ -154,3 +174,39 @@ def test_agent_probe_uses_the_same_workload_and_records_validation_evidence(monk
         "measurement_finished_at": "2026-10-07T01:00:04Z",
     }
     assert backend.evidence["agent_window"]["records"][0]["origin"] == "agent_probe"
+
+
+def test_new_case_profiles_build_their_faults():
+    for path in sorted((ROOT / "cases").iterdir()):
+        backend = ContainerlabBackend(load_case(path))
+        assert backend.fault.kind == load_case(path).fault["kind"]
+
+
+def test_composite_fault_rejects_routing_and_single_children():
+    case = load_case(ROOT / "cases/multi_loss_on_two_links")
+    with pytest.raises(ValueError, match="composite"):
+        ContainerlabBackend(replace(case, fault={**case.fault, "faults": case.fault["faults"][:1]}))
+    bgp = load_case(ROOT / "cases/bgp_session_down").fault
+    with pytest.raises(ValueError, match="composite"):
+        ContainerlabBackend(replace(case, fault={**case.fault, "faults": [bgp, bgp]}))
+
+
+def test_bgp_fault_restores_the_session_and_verifies_the_route(monkeypatch):
+    backend = ContainerlabBackend(load_case(ROOT / "cases/bgp_session_down"))
+    commands = []
+    alternate = False
+    monkeypatch.setattr("graynet.environments.faults.time.sleep", lambda seconds: None)
+    monkeypatch.setattr(backend, "_wait_for_routing", lambda: None)
+
+    def docker(node, *args, **kwargs):
+        nonlocal alternate
+        commands.append(args)
+        if args[0] == "vtysh":
+            alternate = any("neighbor" in part and "no " not in part for part in args)
+        return "via 10.12.1.2 dev eth4" if alternate else "via 10.12.0.2 dev eth3"
+
+    monkeypatch.setattr(backend, "_docker", docker)
+    backend.fault.start()
+    assert backend.fault.active and any("neighbor 10.12.0.2 shutdown" in c for c in commands)
+    backend.fault.stop()
+    assert not backend.fault.active and any("no neighbor 10.12.0.2 shutdown" in c for c in commands)

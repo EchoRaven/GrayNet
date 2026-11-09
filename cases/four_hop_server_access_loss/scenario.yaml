@@ -1,0 +1,36 @@
+schema_version: 1
+id: four-hop-server-access-loss-01
+title: Packet loss on the far access link
+topology: ../../environments/four_hop/topology.clab.yml
+network: four_hop
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: link_loss
+  node: r4
+  interface: eth2
+  loss_percent: 1
+  seed: 11
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    Packet loss on the r4:eth2--user-server:eth1 access link reduces TCP
+    throughput while the router chain remains healthy.
+  anomaly: true
+  component: r4:eth2
+  component_aliases: [user-server:eth1]
+  mechanism: packet_loss
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

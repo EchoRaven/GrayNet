@@ -1,0 +1,35 @@
+schema_version: 1
+id: four-hop-first-hop-delay-01
+title: Added delay between r1 and r2
+topology: ../../environments/four_hop/topology.clab.yml
+network: four_hop
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: link_delay
+  node: r1
+  interface: eth2
+  delay_ms: 200
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    Added delay on the r1:eth2--r2:eth1 link raises RTT and reduces TCP
+    throughput. Pings to successive hops should place the increase on this link.
+  anomaly: true
+  component: r1:eth2
+  component_aliases: [r2:eth1]
+  mechanism: delay
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

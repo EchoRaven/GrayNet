@@ -1,0 +1,34 @@
+schema_version: 1
+id: noisy-subthreshold-congestion-01
+title: Extra traffic below the service requirement with background variation
+topology: ../../environments/noisy_two_path/topology.clab.yml
+network: noisy_two_path
+benign_fault: true
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: cross_traffic
+  client: load-client
+  server: load-server
+  server_ip: 10.4.0.2
+  rate_mbps: 3
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    A small additional traffic load shares the primary path, but the service
+    requirement is still met despite normal variation. This is not a service
+    degradation.
+  anomaly: false
+validation:
+  metric: throughput_mbps
+  effect: stable
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80
