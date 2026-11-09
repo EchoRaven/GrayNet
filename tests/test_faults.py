@@ -8,6 +8,7 @@ from graynet.scenarios.definitions import load_case
 from graynet.tools.network import queue_statistics
 
 ROOT = Path(__file__).parents[1]
+IMPAIRMENT_CASES = {"link_rate_limit": "capacity_limit_server_access"}
 
 
 @pytest.mark.parametrize(
@@ -52,10 +53,12 @@ def test_endpoint_overload_requires_matched_healthy_cpu_limit():
         ("link_loss", "loss_percent", 101),
         ("link_delay", "delay_ms", -1),
         ("link_loss", "seed", True),
+        ("link_jitter_server_access", "jitter_ms", 501),
+        ("link_rate_limit", "rate_mbps", 0),
     ],
 )
 def test_rejects_bad_impairment_parameters(kind, field, value):
-    case = load_case(ROOT / "cases" / kind)
+    case = load_case(ROOT / "cases" / IMPAIRMENT_CASES.get(kind, kind))
     with pytest.raises(ValueError):
         ContainerlabBackend(replace(case, fault={**case.fault, field: value}))
 

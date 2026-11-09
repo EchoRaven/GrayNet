@@ -65,6 +65,7 @@ class CaseDefinition:
     network: str | None = None
     environment_path: Path | None = None
     partial_path: PartialPathSpec | None = None
+    benign_fault: bool = False
 
 
 def _object(value: Any, field: str) -> dict[str, Any]:
@@ -125,6 +126,7 @@ def load_case(directory: Path | str) -> CaseDefinition:
             "network",
             "incident",
             "partial_path",
+            "benign_fault",
         },
         "scenario",
     )
@@ -217,6 +219,10 @@ def load_case(directory: Path | str) -> CaseDefinition:
             raise CaseFormatError("invalid partial path slowdown range")
         partial_path = PartialPathSpec(flow, low, high)
 
+    benign_fault = raw.get("benign_fault", False)
+    if not isinstance(benign_fault, bool):
+        raise CaseFormatError("benign_fault must be a boolean")
+
     expected = _object(raw.get("ground_truth"), "ground_truth")
     _allowed_keys(
         expected,
@@ -243,11 +249,13 @@ def load_case(directory: Path | str) -> CaseDefinition:
     elif (
         component is not None
         or mechanism is not None
-        or (fault_kind != "none" and partial_path is None)
+        or (fault_kind != "none" and partial_path is None and not benign_fault)
     ):
         raise CaseFormatError(
             "a healthy control needs fault.kind: none and no component or mechanism"
         )
+    if benign_fault and (anomaly or fault_kind == "none" or partial_path is not None):
+        raise CaseFormatError("benign_fault needs a healthy two-path case with an active fault")
     aliases = {}
     for field in ("component_aliases", "mechanism_aliases"):
         values = expected.get(field, [])
@@ -361,4 +369,5 @@ def load_case(directory: Path | str) -> CaseDefinition:
         network=network,
         environment_path=environment_path,
         partial_path=partial_path,
+        benign_fault=benign_fault,
     )

@@ -559,7 +559,7 @@ class ContainerlabBackend:
                 f"cross traffic did not traverse the network: {load_tx_mbps:.2f} Mbps sent, {load_rx_mbps:.2f} Mbps received"
             )
         checks = self._checks()
-        if phase == "incident" and self.fault.kind == "link_delay":
+        if phase == "incident" and self.fault.kind == "link_delay" and not case.benign_fault:
             baseline_rtt = self.evidence["phases"]["baseline"]["checks"]["rtt_avg_ms"]
             if (
                 baseline_rtt is None
@@ -587,6 +587,7 @@ class ContainerlabBackend:
         if (
             phase == "incident"
             and self.fault.kind == "link_loss"
+            and not case.benign_fault
             and self.evidence["phases"][phase]["fault_after"]["dropped"] <= fault_before["dropped"]
         ):
             raise CommandError("no loss was observed on the impaired interface")

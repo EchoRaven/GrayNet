@@ -15,6 +15,7 @@ MECHANISMS = (
     "packet_loss",
     "delay",
     "endpoint_overload",
+    "capacity_limit",
     "routing",
     "multiple",
     "unknown",

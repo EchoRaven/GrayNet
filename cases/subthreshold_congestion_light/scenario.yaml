@@ -1,0 +1,35 @@
+schema_version: 1
+id: subthreshold-congestion-light-01
+title: Competing traffic below the service requirement
+topology: ../../environments/two_path/topology.clab.yml
+network: two_path
+benign_fault: true
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: cross_traffic
+  client: load-client
+  server: load-server
+  server_ip: 10.4.0.2
+  rate_mbps: 3
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    A small amount of competing traffic shares the primary path, but service
+    throughput remains within 20% of its healthy reference. Counters may show
+    traffic and queue occupancy, yet the service requirement is met, so this is
+    not a service degradation.
+  anomaly: false
+validation:
+  metric: throughput_mbps
+  effect: stable
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

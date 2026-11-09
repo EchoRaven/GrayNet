@@ -12,6 +12,14 @@ if TYPE_CHECKING:
     from graynet.environments.containerlab import ContainerlabBackend
 
 
+LINK_IMPAIRMENTS = {
+    "link_loss": ("loss_percent", 50),
+    "link_delay": ("delay_ms", 500),
+    "link_jitter": ("delay_ms", 500),
+    "link_rate_limit": ("rate_mbps", 10000),
+}
+
+
 def loss_parameters(raw: str) -> tuple[float, int | None]:
     """Read effective loss and seed from a private netem queue snapshot."""
     loss = re.search(r"\bloss\s+(?:random\s+)?([\d.]+)%", raw)
@@ -51,6 +59,15 @@ class FaultController:
             },
             "link_loss": {"kind", "node", "interface", "loss_percent", "seed", "duration_seconds"},
             "link_delay": {"kind", "node", "interface", "delay_ms", "duration_seconds"},
+            "link_jitter": {
+                "kind",
+                "node",
+                "interface",
+                "delay_ms",
+                "jitter_ms",
+                "duration_seconds",
+            },
+            "link_rate_limit": {"kind", "node", "interface", "rate_mbps", "duration_seconds"},
             "endpoint_overload": {"kind", "node", "workers", "duration_seconds"},
         }
         if self.kind not in allowed or set(self.spec) - allowed[self.kind]:
@@ -79,7 +96,7 @@ class FaultController:
                 raise ValueError("endpoint overload needs the service endpoint and 1..64 workers")
             if backend.case.workload.get("cpu_limit_cores") is None:
                 raise ValueError("endpoint contention needs a fixed CPU limit in all phases")
-        elif self.kind in ("link_loss", "link_delay"):
+        elif self.kind in LINK_IMPAIRMENTS:
             self.node, self.interface = self.spec.get("node"), self.spec.get("interface")
             if (
                 self.node not in backend.network.policy.interfaces
@@ -88,11 +105,10 @@ class FaultController:
                 raise ValueError("link impairment needs an existing managed data-plane interface")
             if (self.node, self.interface) == (backend.queue_node, backend.queue_interface):
                 raise ValueError("do not replace the operational shaper with a fault injector")
-            self.value = positive(
-                self.spec.get("loss_percent" if self.kind == "link_loss" else "delay_ms"),
-                self.kind,
-                50 if self.kind == "link_loss" else 500,
-            )
+            field, maximum = LINK_IMPAIRMENTS[self.kind]
+            self.value = positive(self.spec.get(field), self.kind, maximum)
+            if self.kind == "link_jitter":
+                self.jitter = positive(self.spec.get("jitter_ms"), "jitter_ms", 500)
             self.seed = self.spec.get("seed", 11)
             if type(self.seed) is not int or not 0 <= self.seed < 2**32:
                 raise ValueError("fault seed must be an unsigned 32-bit integer")
@@ -104,7 +120,7 @@ class FaultController:
         if self.kind == "cross_traffic" or self.kind == "none":
             if self.backend._load_running() != expected:
                 raise RuntimeError(f"unexpected cross traffic state during {phase}")
-        elif self.kind in ("link_loss", "link_delay"):
+        elif self.kind in LINK_IMPAIRMENTS:
             partial = self.backend.case.partial_path is not None
             raw = self.backend._docker(
                 self.node,
@@ -166,11 +182,14 @@ class FaultController:
             if not uses_neutral_queue and existing.strip() and "qdisc noqueue" not in existing:
                 self.started = False
                 raise RuntimeError("refusing to replace an existing operational queue")
-            option = (
-                ["loss", "random", f"{self.value:g}%", "seed", str(self.seed)]
-                if self.kind == "link_loss"
-                else ["delay", f"{self.value:g}ms"]
-            )
+            if self.kind == "link_loss":
+                option = ["loss", "random", f"{self.value:g}%", "seed", str(self.seed)]
+            elif self.kind == "link_jitter":
+                option = ["delay", f"{self.value:g}ms", f"{self.jitter:g}ms"]
+            elif self.kind == "link_rate_limit":
+                option = ["rate", f"{self.value:g}mbit"]
+            else:
+                option = ["delay", f"{self.value:g}ms"]
             self.backend._docker(
                 self.node,
                 "tc",
@@ -190,7 +209,7 @@ class FaultController:
 
     def snapshot(self) -> dict[str, Any]:
         result: dict[str, Any] = {"kind": self.kind, "active": self.active}
-        if self.kind in ("link_loss", "link_delay"):
+        if self.kind in LINK_IMPAIRMENTS:
             raw = self.backend._docker(
                 self.node, "tc", "-s", "qdisc", "show", "dev", self.interface
             )

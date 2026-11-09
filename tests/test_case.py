@@ -64,7 +64,7 @@ def test_each_portfolio_uses_shared_public_inputs(profile):
     expected = environment / "incident.md"
     cases = [load_case(path) for path in sorted((root / "cases").iterdir()) if path.is_dir()]
     cases = [case for case in cases if case.network == profile]
-    assert len(cases) == 7
+    assert len(cases) == {"two_path": 28, "partial_path": 9}[profile]
     assert {case.incident_path for case in cases} == {expected.resolve()}
     assert {case.incident for case in cases} == {expected.read_text().strip()}
     assert {case.environment_path for case in cases} == {environment / "environment.md"}
@@ -114,3 +114,31 @@ def test_standalone_incident_must_exist_and_be_nonempty(tmp_path, content):
         (directory / "incident.md").write_text(content)
     with pytest.raises(CaseFormatError, match="incident report"):
         load_case(directory)
+
+
+def test_benign_fault_is_a_healthy_case_with_an_active_fault() -> None:
+    case = load_case(Path(__file__).parents[1] / "cases/decoy_backup_link_loss")
+    assert case.benign_fault and not case.ground_truth.anomaly
+    assert case.fault["kind"] == "link_loss" and case.validation.effect == "stable"
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "message"),
+    [
+        ("benign_fault: true", "benign_fault: 1", "must be a boolean"),
+        ("benign_fault: true\n", "", "healthy control"),
+    ],
+)
+def test_reject_inconsistent_benign_fault(tmp_path: Path, old: str, new: str, message: str) -> None:
+    root = Path(__file__).parents[1]
+    case = root / "cases" / "decoy_backup_link_loss"
+    text = (case / "scenario.yaml").read_text().replace(old, new)
+    copy = root / "cases" / f".test-{tmp_path.name}"
+    copy.mkdir()
+    try:
+        (copy / "scenario.yaml").write_text(text)
+        with pytest.raises(CaseFormatError, match=message):
+            load_case(copy)
+    finally:
+        (copy / "scenario.yaml").unlink()
+        copy.rmdir()

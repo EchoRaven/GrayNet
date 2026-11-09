@@ -1,0 +1,40 @@
+schema_version: 1
+id: link-jitter-server-access-01
+title: Delay variation on r2:eth3
+topology: ../../environments/two_path/topology.clab.yml
+network: two_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: link_jitter
+  node: r2
+  interface: eth3
+  delay_ms: 60
+  jitter_ms: 50
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    Highly variable delay on the r2:eth3--user-server:eth1 access link
+    destabilizes TCP and reduces throughput. Average RTT rises and RTT samples
+    vary widely, while routing sessions stay established and the queue does not
+    drop packets. Segment RTT measurements should place the variation on this
+    link.
+  anomaly: true
+  component: r2:eth3
+  component_aliases: [user-server:eth1]
+  mechanism: delay
+  mechanism_aliases: ["jitter"]
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

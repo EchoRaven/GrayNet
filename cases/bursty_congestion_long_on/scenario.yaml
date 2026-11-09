@@ -1,0 +1,45 @@
+schema_version: 1
+id: bursty-congestion-long-on-01
+title: Bursty cross traffic on a preferred path
+topology: ../../environments/two_path/topology.clab.yml
+network: two_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: cross_traffic
+  client: load-client
+  server: load-server
+  server_ip: 10.4.0.2
+  rate_mbps: 35
+  duration_seconds: 240
+  pattern:
+    kind: bursty
+    on_seconds: 20
+    off_seconds: 10
+ground_truth:
+  diagnosis: >-
+    Intermittent competing traffic congests the primary r1:eth3--r2:eth1 path.
+    Service throughput drops during busy intervals and recovers between them.
+    Queue contention, rather than a broken routing session, causes the slowdown.
+    A single healthy sample does not establish sustained health. An agent need
+    not identify the exact period.
+  anomaly: true
+  component: r1-r2-primary
+  component_aliases: [r1:eth3, r2:eth1, "r1:eth3--r2:eth1"]
+  mechanism: congestion
+  mechanism_aliases: ["cross-traffic congestion", "queue contention"]
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 12
+  pattern: bursty
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80

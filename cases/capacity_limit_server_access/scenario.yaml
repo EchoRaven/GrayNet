@@ -1,0 +1,38 @@
+schema_version: 1
+id: capacity-limit-server-access-01
+title: Reduced capacity on r2:eth3
+topology: ../../environments/two_path/topology.clab.yml
+network: two_path
+workload:
+  kind: iperf3
+  client: user-client
+  server: user-server
+  server_ip: 10.2.0.2
+  duration_seconds: 4
+  cpu_limit_cores: 0.1
+fault:
+  kind: link_rate_limit
+  node: r2
+  interface: eth3
+  rate_mbps: 20
+  duration_seconds: 180
+ground_truth:
+  diagnosis: >-
+    The usable capacity of the r2:eth3--user-server:eth1 access link has fallen
+    below the service rate. A standing backlog forms at this interface, and
+    throughput settles at the reduced rate. No competing traffic explains the
+    slowdown, and routing sessions stay established. The exact rate is not
+    required.
+  anomaly: true
+  component: r2:eth3
+  component_aliases: [user-server:eth1]
+  mechanism: capacity_limit
+validation:
+  metric: throughput_mbps
+  effect: degraded
+  direction: decrease
+  threshold: 0.20
+  min_samples: 5
+  max_baseline_cv: 0.15
+  recovery_tolerance: 0.15
+  min_affected_fraction: 0.80
